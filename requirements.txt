@@ -1,0 +1,14 @@
+# CineTag — AI Movie Classification Pipeline
+# Requirements
+
+# Core ML
+scikit-learn>=1.2.0
+pandas>=1.5.0
+numpy>=1.23.0
+
+# AWS SDK (for production deployment)
+boto3>=1.26.0
+sagemaker>=2.150.0
+
+# Utilities
+python-dotenv>=1.0.0

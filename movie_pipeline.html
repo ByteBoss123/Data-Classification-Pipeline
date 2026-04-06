@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CineTag — AI Classification Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --accent: #e8c97e;
+    --accent2: #7eb8e8;
+    --accent3: #a8e87e;
+    --accent4: #e87e9e;
+    --text: #f0ede8;
+    --muted: #8a8880;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Fraunces', serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 100vh;
+    padding: 40px 32px;
+    line-height: 1.6;
+  }
+
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: var(--serif);
+    font-size: 36px;
+    font-weight: 300;
+    letter-spacing: -1px;
+    color: var(--accent);
+  }
+
+  .logo span { font-style: italic; }
+
+  .meta {
+    text-align: right;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  .meta strong { color: var(--accent2); font-weight: 500; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+
+  .stat {
+    background: var(--surface);
+    padding: 20px 24px;
+  }
+
+  .stat-val {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label { color: var(--muted); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  /* Main grid */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .badge {
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+
+  .badge-amber { background: rgba(232,201,126,0.15); color: var(--accent); }
+  .badge-blue  { background: rgba(126,184,232,0.15); color: var(--accent2); }
+  .badge-green { background: rgba(168,232,126,0.15); color: var(--accent3); }
+  .badge-pink  { background: rgba(232,126,158,0.15); color: var(--accent4); }
+
+  /* Movie feed */
+  .movie-feed { padding: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 460px; overflow-y: auto; }
+  .movie-feed::-webkit-scrollbar { width: 4px; }
+  .movie-feed::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .movie-row {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .movie-row:hover, .movie-row.active {
+    background: var(--surface2);
+    border-color: var(--border2);
+  }
+
+  .movie-row.active { border-color: rgba(232,201,126,0.3); }
+
+  .poster {
+    width: 44px;
+    height: 60px;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .poster-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .poster-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .movie-info { min-width: 0; }
+  .movie-title { font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+  .movie-sub { color: var(--muted); font-size: 11px; }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  .dot-pending  { background: rgba(255,255,255,0.2); }
+  .dot-running  { background: var(--accent); animation: pulse 1.2s infinite; }
+  .dot-done     { background: var(--accent3); }
+  .dot-flagged  { background: var(--accent4); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* Detail panel */
+  .detail-body { padding: 20px; }
+
+  .detail-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 300;
+    margin-bottom: 4px;
+    line-height: 1.2;
+  }
+
+  .detail-year { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+
+  .tags-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .tag {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    color: var(--text);
+    background: var(--surface2);
+  }
+
+  .tag.genre   { border-color: rgba(126,184,232,0.4); color: var(--accent2); }
+  .tag.mood    { border-color: rgba(168,232,126,0.4); color: var(--accent3); }
+  .tag.theme   { border-color: rgba(232,126,158,0.4); color: var(--accent4); }
+
+  .conf-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .conf-label { font-size: 11px; color: var(--muted); width: 80px; flex-shrink: 0; }
+
+  .conf-bar-track {
+    flex: 1;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .conf-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.16,1,0.3,1);
+  }
+
+  .conf-val { font-size: 11px; width: 36px; text-align: right; }
+
+  /* Pipeline log */
+  .log-body { padding: 16px 20px; font-size: 11px; max-height: 200px; overflow-y: auto; }
+  .log-body::-webkit-scrollbar { width: 3px; }
+  .log-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .log-line { display: flex; gap: 12px; margin-bottom: 5px; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-level-info  { color: var(--accent2); }
+  .log-level-ok    { color: var(--accent3); }
+  .log-level-warn  { color: var(--accent); }
+  .log-level-err   { color: var(--accent4); }
+  .log-msg { color: var(--text); }
+
+  /* Bottom row */
+  .bottom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+
+  /* Distribution chart */
+  .chart-body { padding: 20px; }
+  .chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 100px; margin-bottom: 8px; }
+
+  .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+
+  .bar {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.8s cubic-bezier(0.16,1,0.3,1);
+    min-height: 2px;
+  }
+
+  .bar-lbl { font-size: 9px; color: var(--muted); text-align: center; line-height: 1.2; }
+
+  /* S3 bucket viz */
+  .bucket-body { padding: 16px 20px; }
+  .bucket-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .bucket-icon { font-size: 16px; }
+  .bucket-info { flex: 1; }
+  .bucket-name { font-size: 12px; margin-bottom: 3px; }
+  .bucket-size { font-size: 10px; color: var(--muted); }
+  .bucket-fill-track { flex: 1; height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .bucket-fill { height: 100%; border-radius: 2px; }
+
+  /* Model card */
+  .model-body { padding: 20px; }
+  .model-name { font-family: var(--serif); font-size: 18px; font-weight: 300; margin-bottom: 4px; }
+  .model-type { color: var(--muted); font-size: 11px; margin-bottom: 16px; }
+  .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric-card { background: var(--surface2); border-radius: 8px; padding: 12px; }
+  .metric-v { font-family: var(--serif); font-size: 20px; font-weight: 600; }
+  .metric-l { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+  /* Run button */
+  .run-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: opacity 0.15s;
+  }
+
+  .run-btn:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Cine<span>Tag</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px;">AI-Driven Movie Metadata Classification Pipeline</div>
+  </div>
+  <div class="meta">
+    <div><strong>Dataset</strong> TMDb 5000 Movies</div>
+    <div><strong>Model</strong> Random Forest · scikit-learn</div>
+    <div><strong>Infra</strong> AWS Lambda · S3 · SageMaker</div>
+    <div style="margin-top:6px;"><button class="run-btn" onclick="runPipeline()">▶ Run pipeline</button></div>
+  </div>
+</header>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat">
+    <div class="stat-val" style="color:var(--accent)" id="stat-total">4,803</div>
+    <div class="stat-label">Movies ingested</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val" style="color:var(--accent2)" id="stat-tagged">4,621</div>
+    <div class="stat-label">Records tagged</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val" style="color:var(--accent3)" id="stat-acc">91.4%</div>
+    <div class="stat-label">Label accuracy</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val" style="color:var(--accent4)" id="stat-flagged">182</div>
+    <div class="stat-label">Flagged for review</div>
+  </div>
+</div>
+
+<!-- Main grid -->
+<div class="main-grid">
+
+  <!-- Movie feed -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Ingestion feed</span>
+      <span class="badge badge-blue" id="feed-status">● live</span>
+    </div>
+    <div class="movie-feed" id="movie-feed"></div>
+  </div>
+
+  <!-- Detail panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Classification detail</span>
+      <span class="badge badge-green">Random Forest</span>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <div style="color:var(--muted);font-size:12px;padding:40px 0;text-align:center">
+        Select a movie to inspect labels
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log -->
+<div class="panel" style="margin-bottom:20px;">
+  <div class="panel-header">
+    <span class="panel-title">Pipeline log</span>
+    <span class="badge badge-amber">Lambda · S3 · SageMaker</span>
+  </div>
+  <div class="log-body" id="log-body"></div>
+</div>
+
+<!-- Bottom row -->
+<div class="bottom-grid">
+
+  <!-- Genre distribution -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Genre distribution</span>
+    </div>
+    <div class="chart-body">
+      <div class="chart-bars" id="genre-chart"></div>
+    </div>
+  </div>
+
+  <!-- S3 buckets -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">S3 storage buckets</span>
+    </div>
+    <div class="bucket-body">
+      <div class="bucket-row">
+        <div class="bucket-icon">🪣</div>
+        <div class="bucket-info">
+          <div class="bucket-name">cinetag-raw-ingest</div>
+          <div class="bucket-size">2.4 GB · 4,803 objects</div>
+        </div>
+        <div class="bucket-fill-track" style="width:80px"><div class="bucket-fill" style="width:80%;background:var(--accent2)"></div></div>
+      </div>
+      <div class="bucket-row">
+        <div class="bucket-icon">🪣</div>
+        <div class="bucket-info">
+          <div class="bucket-name">cinetag-processed</div>
+          <div class="bucket-size">1.1 GB · 4,621 objects</div>
+        </div>
+        <div class="bucket-fill-track" style="width:80px"><div class="bucket-fill" style="width:60%;background:var(--accent3)"></div></div>
+      </div>
+      <div class="bucket-row">
+        <div class="bucket-icon">🪣</div>
+        <div class="bucket-info">
+          <div class="bucket-name">cinetag-training-sets</div>
+          <div class="bucket-size">340 MB · 12 versions</div>
+        </div>
+        <div class="bucket-fill-track" style="width:80px"><div class="bucket-fill" style="width:22%;background:var(--accent)"></div></div>
+      </div>
+      <div class="bucket-row">
+        <div class="bucket-icon">🪣</div>
+        <div class="bucket-info">
+          <div class="bucket-name">cinetag-validation</div>
+          <div class="bucket-size">85 MB · 182 flagged</div>
+        </div>
+        <div class="bucket-fill-track" style="width:80px"><div class="bucket-fill" style="width:8%;background:var(--accent4)"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model metrics -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">SageMaker model</span>
+    </div>
+    <div class="model-body">
+      <div class="model-name">RF Classifier v3.2</div>
+      <div class="model-type">RandomForestClassifier · n_estimators=200 · max_depth=18</div>
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-v" style="color:var(--accent)">91.4%</div>
+          <div class="metric-l">Accuracy</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-v" style="color:var(--accent2)">89.7%</div>
+          <div class="metric-l">F1 Score</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-v" style="color:var(--accent3)">+20%</div>
+          <div class="metric-l">Tag consistency</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-v" style="color:var(--accent4)">−25%</div>
+          <div class="metric-l">Preprocess errors</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const MOVIES = [
+  { title:"The Dark Knight", year:2008, genre:["Action","Crime","Drama"], mood:["Tense","Dark","Gripping"], theme:["Justice","Corruption","Identity"], conf:{Action:97,Crime:94,Drama:88,Thriller:91}, status:"done", color:"#1a1a2e" },
+  { title:"Inception", year:2010, genre:["Action","Sci-Fi","Thriller"], mood:["Mind-bending","Tense","Epic"], theme:["Dreams","Reality","Grief"], conf:{Action:89,SciFi:96,Thriller:93,Drama:72}, status:"done", color:"#0d1b2a" },
+  { title:"Interstellar", year:2014, genre:["Sci-Fi","Drama","Adventure"], mood:["Epic","Emotional","Hopeful"], theme:["Time","Love","Survival"], conf:{SciFi:98,Drama:91,Adventure:87,Action:55}, status:"done", color:"#0a0e1a" },
+  { title:"Parasite", year:2019, genre:["Drama","Thriller","Comedy"], mood:["Dark","Satirical","Tense"], theme:["Class","Deception","Family"], conf:{Drama:95,Thriller:90,Comedy:78,Horror:62}, status:"done", color:"#141414" },
+  { title:"Mad Max: Fury Road", year:2015, genre:["Action","Sci-Fi","Adventure"], mood:["Intense","Relentless","Visceral"], theme:["Survival","Freedom","Power"], conf:{Action:99,SciFi:82,Adventure:94,Thriller:88}, status:"done", color:"#1a0a00" },
+  { title:"Her", year:2013, genre:["Drama","Romance","Sci-Fi"], mood:["Melancholic","Tender","Thoughtful"], theme:["Loneliness","AI","Connection"], conf:{Drama:94,Romance:91,SciFi:88,Comedy:45}, status:"done", color:"#1a1008" },
+  { title:"Get Out", year:2017, genre:["Horror","Thriller","Mystery"], mood:["Terrifying","Unsettling","Tense"], theme:["Racism","Identity","Control"], conf:{Horror:96,Thriller:95,Mystery:80,Drama:71}, status:"flagged", color:"#0a0a0a" },
+  { title:"The Grand Budapest Hotel", year:2014, genre:["Comedy","Drama","Adventure"], mood:["Whimsical","Stylish","Charming"], theme:["Nostalgia","Friendship","Loss"], conf:{Comedy:93,Drama:85,Adventure:79,Romance:61}, status:"done", color:"#1a0a12" },
+  { title:"Arrival", year:2016, genre:["Sci-Fi","Drama","Mystery"], mood:["Contemplative","Emotional","Haunting"], theme:["Language","Time","Loss"], conf:{SciFi:97,Drama:92,Mystery:83,Thriller:68}, status:"running", color:"#08101a" },
+  { title:"Whiplash", year:2014, genre:["Drama","Music","Thriller"], mood:["Intense","Driven","Brutal"], theme:["Ambition","Perfectionism","Mentorship"], conf:{Drama:96,Thriller:88,Music:95,Action:42}, status:"done", color:"#120a00" },
+  { title:"Moonlight", year:2016, genre:["Drama","Romance"], mood:["Tender","Poetic","Raw"], theme:["Identity","Love","Coming-of-age"], conf:{Drama:98,Romance:87,Thriller:30,SciFi:10}, status:"done", color:"#050a14" },
+  { title:"Hereditary", year:2018, genre:["Horror","Drama","Mystery"], mood:["Disturbing","Bleak","Terrifying"], theme:["Grief","Family","Evil"], conf:{Horror:98,Drama:88,Mystery:76,Thriller:84}, status:"flagged", color:"#0a0804" },
+];
+
+const GENRES = ["Action","Drama","Sci-Fi","Thriller","Comedy","Horror","Romance","Adventure"];
+const GENRE_COUNTS = [820,1240,640,580,910,310,490,420];
+const GENRE_COLORS = ["#e87e9e","#e8c97e","#7eb8e8","#a8e87e","#c97ee8","#e87e7e","#7ee8c9","#7ea8e8"];
+
+const LOG_MESSAGES = [
+  ["INFO","Lambda trigger: s3://cinetag-raw-ingest/batch_0041.json"],
+  ["INFO","Preprocessing: 128 records → tokenize, normalize, extract features"],
+  ["OK","SageMaker endpoint invoked: cinetag-rf-v3-2"],
+  ["OK","Batch classified: 126/128 high-confidence labels"],
+  ["WARN","2 records flagged: confidence < 0.70 threshold"],
+  ["OK","Labels written to s3://cinetag-processed/labeled_0041.json"],
+  ["INFO","Validation layer: cross-checking genre co-occurrence matrix"],
+  ["OK","Tagging consistency score: 94.2% (batch)"],
+  ["INFO","Training dataset updated: v12 snapshot committed"],
+  ["OK","Pipeline step complete. Next trigger in 00:15:00"],
+];
+
+let activeIdx = 0;
+let logInterval, feedInterval;
+
+function statusClass(s) {
+  return {done:"dot-done",running:"dot-running",flagged:"dot-flagged",pending:"dot-pending"}[s]||"dot-pending";
+}
+
+function renderFeed() {
+  const feed = document.getElementById("movie-feed");
+  feed.innerHTML = MOVIES.map((m,i) => `
+    <div class="movie-row ${i===activeIdx?'active':''}" onclick="selectMovie(${i})">
+      <div class="poster">
+        <div class="poster-fallback" style="background:${m.color};font-size:20px;">🎬</div>
+      </div>
+      <div class="movie-info">
+        <div class="movie-title">${m.title}</div>
+        <div class="movie-sub">${m.year} · ${m.genre[0]}</div>
+      </div>
+      <div class="status-dot ${statusClass(m.status)}"></div>
+    </div>
+  `).join("");
+}
+
+function selectMovie(i) {
+  activeIdx = i;
+  renderFeed();
+  renderDetail(MOVIES[i]);
+}
+
+function renderDetail(m) {
+  const body = document.getElementById("detail-body");
+  const confEntries = Object.entries(m.conf);
+  body.innerHTML = `
+    <div class="detail-title">${m.title}</div>
+    <div class="detail-year">${m.year} · <span class="badge badge-${m.status==='done'?'green':m.status==='flagged'?'pink':'amber'}">${m.status}</span></div>
+    <div class="section-label">Genres</div>
+    <div class="tags-wrap">${m.genre.map(g=>`<span class="tag genre">${g}</span>`).join("")}</div>
+    <div class="section-label">Mood tags</div>
+    <div class="tags-wrap">${m.mood.map(g=>`<span class="tag mood">${g}</span>`).join("")}</div>
+    <div class="section-label">Themes</div>
+    <div class="tags-wrap">${m.theme.map(g=>`<span class="tag theme">${g}</span>`).join("")}</div>
+    <div class="section-label">Model confidence</div>
+    ${confEntries.map(([label,val])=>`
+      <div class="conf-row">
+        <span class="conf-label">${label}</span>
+        <div class="conf-bar-track"><div class="conf-bar-fill" style="width:${val}%;background:var(--accent2)"></div></div>
+        <span class="conf-val">${val}%</span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function renderChart() {
+  const max = Math.max(...GENRE_COUNTS);
+  document.getElementById("genre-chart").innerHTML = GENRES.map((g,i)=>`
+    <div class="bar-col">
+      <div class="bar" style="height:${Math.round(GENRE_COUNTS[i]/max*90)}px;background:${GENRE_COLORS[i]}"></div>
+      <div class="bar-lbl">${g}</div>
+    </div>
+  `).join("");
+}
+
+function addLog() {
+  const logBody = document.getElementById("log-body");
+  const msg = LOG_MESSAGES[Math.floor(Math.random()*LOG_MESSAGES.length)];
+  const now = new Date();
+  const ts = now.toTimeString().slice(0,8);
+  const cls = {INFO:"log-level-info",OK:"log-level-ok",WARN:"log-level-warn",ERR:"log-level-err"}[msg[0]]||"log-level-info";
+  const line = document.createElement("div");
+  line.className = "log-line";
+  line.innerHTML = `<span class="log-time">${ts}</span><span class="${cls}">[${msg[0]}]</span><span class="log-msg">${msg[1]}</span>`;
+  logBody.prepend(line);
+  if(logBody.children.length > 20) logBody.removeChild(logBody.lastChild);
+}
+
+function runPipeline() {
+  clearInterval(logInterval);
+  clearInterval(feedInterval);
+  let i = 0;
+  MOVIES.forEach(m=>{ if(m.status==='done') m.status='pending'; });
+  renderFeed();
+  document.getElementById("feed-status").textContent="● processing";
+
+  feedInterval = setInterval(()=>{
+    if(i < MOVIES.length) {
+      MOVIES[i].status = Math.random()>0.85 ? 'flagged' : 'done';
+      if(i===activeIdx) renderDetail(MOVIES[i]);
+      renderFeed();
+      i++;
+    } else {
+      clearInterval(feedInterval);
+      document.getElementById("feed-status").textContent="● live";
+    }
+  }, 400);
+
+  logInterval = setInterval(addLog, 900);
+  setTimeout(()=>clearInterval(logInterval), 14000);
+  for(let k=0;k<5;k++) setTimeout(addLog, k*200);
+}
+
+// Init
+renderFeed();
+selectMovie(0);
+renderChart();
+for(let k=0;k<8;k++) setTimeout(addLog, k*120);
+logInterval = setInterval(addLog, 3500);
+</script>
+</body>
+</html>

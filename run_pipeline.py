@@ -38,7 +38,7 @@ def section(n, title):
 def main():
     start = time.time()
     header("CineTag  |  AI-Driven Movie Metadata Classification Pipeline")
-    print("  Dataset   : TMDb 5000 Movies")
+    print("  Dataset   : generated TMDb-style movie metadata (synthetic)")
     print("  Model     : Random Forest · scikit-learn")
     print("  Infra     : Lambda · S3 · SageMaker (local simulation)")
     print(f"  Run time  : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -95,8 +95,8 @@ def main():
     print(f"  {'Records flagged':<32} {ingest_body['total_flagged']}  ({ingest_body['flag_rate_pct']}%)")
     print(f"  {'Model F1 macro':<32} {metrics['f1_macro']*100:.1f}%")
     print(f"  {'Model exact match accuracy':<32} {metrics['exact_match_accuracy']*100:.1f}%")
-    print(f"  {'Tagging consistency':<32} {val_report['tagging_consistency']*100:.1f}%  (+20% vs baseline)")
-    print(f"  {'Preprocessing error rate':<32} {ingest_body['flag_rate_pct']}%  (−25% vs baseline)")
+    print(f"  {'Tagging consistency':<32} {val_report['tagging_consistency']*100:.1f}%")
+    print(f"  {'Preprocessing error rate':<32} {ingest_body['flag_rate_pct']}%")
     print(f"  {'Total run time':<32} {elapsed}s")
     print()
 
